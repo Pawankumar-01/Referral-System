@@ -1,0 +1,18 @@
+# Environment Secrets (API keys, tokens)
+.env
+.env.*
+
+# Local Databases
+referral_system.db
+
+# Generated Assets 
+qr_codes/
+
+# Python Cache 
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS-specific files
+.DS_Store
+Thumbs.db
