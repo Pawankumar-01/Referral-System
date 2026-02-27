@@ -32,7 +32,8 @@ app.mount("/qr", StaticFiles(directory="qr_codes"), name="qr")
 
 
 origins =[
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "https://panaceanova.com"
 ]
 app.add_middleware(
     CORSMiddleware,
