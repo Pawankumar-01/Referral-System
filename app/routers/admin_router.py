@@ -161,3 +161,44 @@ def patients_overview(
         })
 
     return result
+
+
+from app.models.commission import CommissionTransaction
+from app.models.wallet import Wallet
+from datetime import datetime
+
+
+@router.post("/approve-commission/{commission_id}")
+def approve_commission(
+    commission_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+):
+    commission = db.query(CommissionTransaction).filter(
+        CommissionTransaction.id == commission_id
+    ).first()
+
+    if not commission:
+        raise HTTPException(status_code=404, detail="Commission not found")
+
+    if commission.status != "credited":
+        raise HTTPException(status_code=400, detail="Commission not eligible for approval")
+
+    # Credit wallet
+    wallet = db.query(Wallet).filter(
+        Wallet.patient_id == commission.earner_id
+    ).first()
+
+    if not wallet:
+        wallet = Wallet(patient_id=commission.earner_id, balance=0.0)
+        db.add(wallet)
+        db.flush()
+
+    wallet.balance += commission.commission_amount
+
+    commission.status = "approved"
+    commission.approved_at = datetime.utcnow()
+
+    db.commit()
+
+    return {"message": "Commission approved and credited to wallet"}

@@ -72,7 +72,7 @@ def complete_medicine(
     referral.medicine_completed = True
     referral.medicine_completed_at = datetime.utcnow()
 
-    # If consultation not completed yet, stop
+    # Stop if consultation not completed
     if not referral.consultation_completed:
         db.commit()
         return {
@@ -90,7 +90,6 @@ def complete_medicine(
     referral.medicine_amount = medicine_amount
     referral.total_amount = total_bill
 
-    # Get the referred patient (source)
     source_patient = db.query(Patient).filter(
         Patient.id == referral.referred_patient_id
     ).first()
@@ -98,58 +97,64 @@ def complete_medicine(
     current_patient = source_patient.referred_by
     level = 1
 
-    while current_patient and level <= 3:
+    # Commission structure
+    FIXED_COMMISSIONS = {
+        3: 100.0,
+        4: 50.0,
+        5: 40.0,
+        6: 25.0,
+    }
+
+    while current_patient and level <= 6:
+
+        commission = 0.0
 
         if level == 1:
-            # Direct referrer
             commission = (
                 consultation_amount * 0.10 +
-                medicine_amount * 0.03
+                medicine_amount * 0.05
             )
 
         elif level == 2:
-            commission = total_bill * 0.01
+            commission = total_bill * 0.015
 
-        elif level == 3:
-            commission = total_bill * 0.01
+        elif level in FIXED_COMMISSIONS:
+            commission = FIXED_COMMISSIONS[level]
 
-        credit_wallet(db, current_patient.id, commission)
+        # Credit wallet
+        # credit_wallet(db, current_patient.id, commission)
 
+        # Save transaction
         transaction = CommissionTransaction(
             earner_id=current_patient.id,
             source_patient_id=source_patient.id,
             level=level,
             bill_amount=total_bill,
             commission_amount=commission,
+            status="credited"
         )
-
         db.add(transaction)
+
+        # Notify this level earner
+        create_notification(
+            db,
+            current_patient.id,
+            f"💰 Commission Credited!\n\n"
+            f"Level: {level}\n"
+            f"Amount: ₹{commission:.2f}\n"
+            f"Bill Amount: ₹{total_bill:.2f}",
+            NotificationType.sms,
+        )
 
         current_patient = current_patient.referred_by
         level += 1
 
-    # Lock commission
     referral.reward_generated = True
-
-    # Optional notification to direct referrer
-    if referral.referrer_id:
-        create_notification(
-            db,
-            referral.referrer_id,
-            "Your referral has completed full payment. Commission credited to your wallet.",
-            NotificationType.sms,
-        )
 
     db.commit()
     db.refresh(referral)
-    create_notification(
-        db,
-        current_patient.id,
-        f"💰 Commission Credited!\n\nAmount: ₹{commission:.2f}\nLevel: {level}\nBill Amount: ₹{total_bill:.2f}",
-        NotificationType.sms,
-    )
 
     return {
-        "message": "Medicine marked complete and MLM commission processed.",
+        "message": "Medicine marked complete and 6-level MLM commission processed.",
         "referral_id": referral.id
     }
