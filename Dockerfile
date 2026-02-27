@@ -1,19 +1,24 @@
 FROM python:3.11-slim
 
-# Use a neutral path to avoid "app/app" confusion
+# Neutral work directory
 WORKDIR /usr/src/app
 
-# Install system dependencies for psycopg2/Postgres
-RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+# Install system dependencies for PostgreSQL
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
+# Install python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy all files from your local referral_system folder
+# Copy the rest of the code
 COPY . .
 
-# Match the Fly.io default internal port
+# Set the environment variable for Fly.io
 ENV PORT=8080
 
-# Using gunicorn with uvicorn workers for production stability
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", "--bind", "0.0.0.0:8080", "--timeout", "90"]
+# Use the full path for gunicorn or call it via python -m to be safe
+CMD ["python", "-m", "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", "--bind", "0.0.0.0:8080", "--timeout", "90"]
