@@ -8,5 +8,6 @@ class Wallet(Base):
 
     patient_id = Column(TEXT, ForeignKey("patients.id"), primary_key=True)
     balance = Column(Float, default=0.0)
+    used_balance = Column(Float, default=0.0)
 
     patient = relationship("Patient")

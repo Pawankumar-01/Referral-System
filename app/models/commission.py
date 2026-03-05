@@ -10,18 +10,19 @@ class CommissionTransaction(Base):
     __tablename__ = "commission_transactions"
 
     id = Column(TEXT, primary_key=True, default=lambda: str(uuid.uuid4()))
+
     earner_id = Column(TEXT, ForeignKey("patients.id"))
     source_patient_id = Column(TEXT, ForeignKey("patients.id"))
+
     level = Column(Integer)
+
     bill_amount = Column(Float)
     commission_amount = Column(Float)
 
-    status = Column(String, default="credited")  
-    # credited → approved → claimed
-
-    approved_at = Column(DateTime, nullable=True)
-    claimed_at = Column(DateTime, nullable=True)
+    status = Column(String, default="credited")
 
     created_at = Column(DateTime, default=datetime.utcnow)
+    approved_at = Column(DateTime, nullable=True)
+    claimed_at = Column(DateTime, nullable=True)
 
     earner = relationship("Patient", foreign_keys=[earner_id])

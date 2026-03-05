@@ -16,6 +16,7 @@ from app.routers import (
     referral_router,
     admin_router,
     notification_router,
+    portfolio_router
 
 )
 
@@ -50,6 +51,7 @@ app.include_router(admin_router.router)
 app.include_router(notification_router.router)
 app.include_router(wallet_router.router)
 app.include_router(commission_router.router)
+app.include_router(portfolio_router.router)
 
 
 @app.get("/")
