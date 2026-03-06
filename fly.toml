@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for referral-system-nshs2a on 2026-02-27T11:58:52Z
+# fly.toml app configuration file generated for referral-system on 2026-02-27T12:12:59Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'referral-system-nshs2a'
+app = 'referral-system'
 primary_region = 'ams'
 
 [build]
@@ -20,4 +20,4 @@ primary_region = 'ams'
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 512
+  memory_mb = 256
