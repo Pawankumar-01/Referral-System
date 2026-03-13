@@ -22,7 +22,7 @@ from app.models.notification import NotificationType
 from app.models.patient import Patient
 from app.models.referral import Referral
 from app.models.wallet import Wallet
-from app.services.notification_service import create_notification
+# from app.services.notification_service import create_notification
 
 
 # ── Helper: Credit Wallet ────────────────────────────────────────────────────
@@ -153,18 +153,18 @@ def complete_medicine(
         db.add(transaction)
 
         # Notify earner
-        create_notification(
-            db,
-            current_patient.id,
-            (
-                f"💰 Commission Generated!\n\n"
-                f"Level: {level}\n"
-                f"Amount: ₹{commission_amount:.2f}\n"
-                f"Bill Amount: ₹{total_bill:.2f}\n"
-                f"Status: Pending Admin Approval"
-            ),
-            NotificationType.sms,
-        )
+        # create_notification(
+        #     db,
+        #     current_patient.id,
+        #     (
+        #         f"💰 Commission Generated!\n\n"
+        #         f"Level: {level}\n"
+        #         f"Amount: ₹{commission_amount:.2f}\n"
+        #         f"Bill Amount: ₹{total_bill:.2f}\n"
+        #         f"Status: Pending Admin Approval"
+        #     ),
+        #     NotificationType.sms,
+        # )
 
         levels_created.append({"level": level, "earner_id": current_patient.id, "amount": commission_amount})
 

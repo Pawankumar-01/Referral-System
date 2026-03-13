@@ -7,8 +7,8 @@ from app.schemas.referral import ReferralRegister, ReferralOut
 from app.schemas.patient import PatientOut
 from app.utils.coupon_generator import generate_coupon_code
 import uuid, qrcode, os
-from app.services.notification_service import create_notification
-from app.models.notification import NotificationType
+from app.services.whatsapp_service import send_whatsapp_template
+from dotenv import load_dotenv
 from app.utils.qr_generator import _generate_qr
 
 router = APIRouter(prefix="/ref", tags=["Referral"])
@@ -40,29 +40,35 @@ def get_referral_info(coupon_code: str, db: Session = Depends(get_db)):
         "message": "Register below to be referred by this patient",
     }
 
-
 @router.post("/register", response_model=PatientOut)
 def register_via_referral(payload: ReferralRegister, db: Session = Depends(get_db)):
-    # Find referrer
-    referrer = db.query(Patient).filter(Patient.coupon_code == payload.coupon_code).first()
+
+    referrer = db.query(Patient).filter(
+        Patient.coupon_code == payload.coupon_code
+    ).first()
+
     if not referrer:
         raise HTTPException(status_code=404, detail="Invalid referral coupon code")
 
-    # Prevent self-referral
     if referrer.phone == payload.phone:
         raise HTTPException(status_code=400, detail="Self-referral is not allowed")
 
-    # Prevent duplicate phone
     existing = db.query(Patient).filter(Patient.phone == payload.phone).first()
+
     if existing:
-        # Check if already referred
-        dup_referral = db.query(Referral).filter(Referral.referred_patient_id == existing.id).first()
+        dup_referral = db.query(Referral).filter(
+            Referral.referred_patient_id == existing.id
+        ).first()
+
         if dup_referral:
             raise HTTPException(status_code=400, detail="Patient already referred")
+
         raise HTTPException(status_code=400, detail="Phone already registered")
 
     coupon = _unique_coupon(db)
+
     patient_id = str(uuid.uuid4())
+
     qr_path = _generate_qr(coupon, patient_id)
 
     new_patient = Patient(
@@ -74,6 +80,7 @@ def register_via_referral(payload: ReferralRegister, db: Session = Depends(get_d
         qr_code_path=qr_path,
         referred_by_id=referrer.id,
     )
+
     db.add(new_patient)
     db.flush()
 
@@ -82,25 +89,36 @@ def register_via_referral(payload: ReferralRegister, db: Session = Depends(get_d
         referrer_id=referrer.id,
         referred_patient_id=new_patient.id,
     )
+
     db.add(referral)
+
     db.commit()
     db.refresh(new_patient)
 
-    # Notify new patient
-    create_notification(
-        db,
-        new_patient.id,
-        f"Welcome {new_patient.name}! 🎉\nYou were referred by {referrer.name}.",
-        NotificationType.sms,
+    phone = new_patient.phone.replace("+", "").replace(" ", "")
+
+    send_whatsapp_template(
+        phone,
+        "referral_registration_success",
+        [
+            new_patient.name,
+            new_patient.id,
+            new_patient.phone,
+            new_patient.email or "N/A",
+            new_patient.coupon_code,
+            referrer.name
+        ]
     )
 
-    # Notify referrer
-    create_notification(
-        db,
-        referrer.id,
-        f"Good news! 🎉\n{new_patient.name} registered using your referral code.\nCommission will be processed after treatment.",
-        NotificationType.sms,
+    referrer_phone = referrer.phone.replace("+", "").replace(" ", "")
+
+    send_whatsapp_template(
+        referrer_phone,
+        "referral_joined_notification",
+        [
+            referrer.name,
+            new_patient.name
+        ]
     )
 
-    db.commit()
     return new_patient

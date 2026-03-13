@@ -9,8 +9,7 @@ import uuid
 from typing import List
 import qrcode
 import os
-from app.services.notification_service import create_notification
-from app.models.notification import NotificationType
+from app.services.whatsapp_service import send_whatsapp_template
 from dotenv import load_dotenv
 from app.utils.qr_generator import _generate_qr
 
@@ -37,17 +36,23 @@ def _unique_coupon(db: Session) -> str:
 
 @router.post("/", response_model=PatientOut)
 def create_patient(payload: PatientCreate, db: Session = Depends(get_db)):
+
     existing = db.query(Patient).filter(Patient.phone == payload.phone).first()
     if existing:
         raise HTTPException(status_code=400, detail="Phone already registered")
 
     if payload.webinar_batch_id:
-        batch = db.query(WebinarBatch).filter(WebinarBatch.id == payload.webinar_batch_id).first()
+        batch = db.query(WebinarBatch).filter(
+            WebinarBatch.id == payload.webinar_batch_id
+        ).first()
+
         if not batch:
             raise HTTPException(status_code=404, detail="Webinar batch not found")
 
     coupon = _unique_coupon(db)
+
     patient_id = str(uuid.uuid4())
+
     qr_path = _generate_qr(coupon, patient_id)
 
     patient = Patient(
@@ -59,27 +64,25 @@ def create_patient(payload: PatientCreate, db: Session = Depends(get_db)):
         qr_code_path=qr_path,
         webinar_batch_id=payload.webinar_batch_id,
     )
+
     db.add(patient)
     db.commit()
     db.refresh(patient)
 
+    phone = patient.phone.replace("+", "").replace(" ", "")
 
-    create_notification(
-        db,
-        patient.id,
-        f"Welcome {patient.name}! 🎉\n\nYour referral code: {patient.coupon_code}\nShare it to earn commission.",
-        NotificationType.sms,
+    send_whatsapp_template(
+        phone,
+        "patient_registration_success",
+        [
+            patient.name,
+            patient.id,
+            patient.phone,
+            patient.email or "N/A",
+            patient.coupon_code
+        ]
     )
 
-    db.commit()
-    return patient
-
-
-@router.get("/{patient_id}", response_model=PatientOut)
-def get_patient(patient_id: str, db: Session = Depends(get_db)):
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
     return patient
 
 
@@ -98,6 +101,16 @@ def search_patients(
         query = query.filter(Patient.name.ilike(f"%{name}%"))
 
     return query.order_by(Patient.created_at.desc()).all()
+
+
+@router.get("/{patient_id}", response_model=PatientOut)
+def get_patient(patient_id: str, db: Session = Depends(get_db)):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    return patient
+
+
 
 @router.get("/", response_model=List[PatientOut])
 def list_patients(
